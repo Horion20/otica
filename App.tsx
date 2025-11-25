@@ -4,10 +4,14 @@ import { FrameList } from './components/FrameList';
 import { PricingTab } from './components/PricingTab';
 import { ImportModal } from './components/ImportModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { LoginScreen } from './components/LoginScreen';
 import { SpectacleFrame } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 const App: React.FC = () => {
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [frames, setFrames] = useState<SpectacleFrame[]>([]);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   
@@ -33,6 +37,14 @@ const App: React.FC = () => {
     message: '',
     action: () => {},
   });
+
+  // Check session on mount
+  useEffect(() => {
+    const auth = sessionStorage.getItem('otic_auth');
+    if (auth === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   // Load from localStorage on mount and migrate data structure
   useEffect(() => {
@@ -69,6 +81,17 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('optiRegistryFrames', JSON.stringify(frames));
   }, [frames]);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    sessionStorage.setItem('otic_auth', 'true');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('otic_auth');
+    setActiveTab('home');
+  };
 
   const handleSaveFrame = (frame: SpectacleFrame) => {
     if (editingFrame) {
@@ -199,6 +222,11 @@ const App: React.FC = () => {
     </div>
   );
 
+  // --- RENDER LOGIN IF NOT AUTHENTICATED ---
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-20 print:hidden">
@@ -230,11 +258,19 @@ const App: React.FC = () => {
             <button 
               type="button"
               onClick={() => setImportModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-600 rounded-lg text-sm font-medium hover:bg-brand-100 transition-colors border border-brand-100"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-600 rounded-lg text-sm font-medium hover:bg-brand-100 transition-colors border border-brand-100 hidden sm:flex"
               title="Importar Arquivos (PDF, Excel, CSV)"
             >
               <i className="fas fa-file-import"></i>
-              <span className="hidden sm:inline">Importar Arquivos</span>
+              <span>Importar</span>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setImportModalOpen(true)}
+              className="flex items-center justify-center w-10 h-10 bg-brand-50 text-brand-600 rounded-lg text-sm font-medium hover:bg-brand-100 transition-colors border border-brand-100 sm:hidden"
+              title="Importar"
+            >
+              <i className="fas fa-file-import"></i>
             </button>
             
             {/* Mercado Livre Button */}
@@ -244,7 +280,7 @@ const App: React.FC = () => {
                 setActiveTab('marketplace');
                 handleCancelEdit(); 
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors border ml-2 ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors border ml-2 ${
                 activeTab === 'marketplace' 
                   ? 'bg-[#ffe600] text-[#2d3277] border-[#e5ce00] ring-2 ring-[#ffe600]/50 shadow-md'
                   : 'bg-white text-[#2d3277] border-slate-200 hover:bg-[#fff9c2]'
@@ -256,12 +292,21 @@ const App: React.FC = () => {
                 alt="Logo ML" 
                 className="h-6 w-auto object-contain"
               />
-              <span className="hidden sm:inline">Mercado Livre</span>
+              <span className="hidden md:inline">Mercado Livre</span>
               {marketplaceFrames.length > 0 && (
                  <span className="bg-[#2d3277] text-white text-xs py-0.5 px-1.5 rounded-full ml-1">
                    {marketplaceFrames.length}
                  </span>
               )}
+            </button>
+
+            {/* Logout Button */}
+            <button
+               onClick={handleLogout}
+               className="w-10 h-10 ml-2 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+               title="Sair"
+            >
+              <i className="fas fa-sign-out-alt"></i>
             </button>
           </div>
         </div>
