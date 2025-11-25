@@ -222,7 +222,7 @@ const App: React.FC = () => {
           {/* Logo Section - Click to Home */}
           <div className="cursor-pointer select-none" onClick={() => setActiveTab('home')}>
              <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-wider font-brand uppercase">
-              ÓTICAS CONECTE
+              Gerenciador Comercial
             </h1>
           </div>
           
@@ -522,7 +522,7 @@ const App: React.FC = () => {
     {/* PRINT TEMPLATE (Hidden unless printing) */}
     <div className="hidden print:block bg-white p-8 font-sans text-black">
       <div className="flex justify-between items-center mb-6 border-b border-black pb-4">
-         <h1 className="text-3xl font-bold font-brand uppercase tracking-wider">ÓTICAS CONECTE</h1>
+         <h1 className="text-3xl font-bold font-brand uppercase tracking-wider">Gerenciador Comercial</h1>
          <div className="text-right">
             <h2 className="text-xl font-bold uppercase">{printTitle}</h2>
             <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR')}</p>
