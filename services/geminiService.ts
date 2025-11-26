@@ -1,10 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AIAutoFillData, Gender, SpectacleFrame } from "../types";
+import { Gender, SpectacleFrame } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
 const apiKey = process.env.API_KEY || ''; // In a real scenario, strictly from env
 
 const ai = new GoogleGenAI({ apiKey });
+
+const REFERENCE_SITES_INSTRUCTION = `
+Para garantir a máxima precisão, utilize seu conhecimento associado aos seguintes catálogos e sites oficiais como fonte prioritária:
+- https://www.ray-ban.com/global
+- https://www.farfetch.com/br/shopping/women/items.aspx
+- https://www.vogue-eyewear.com/br
+- https://www.armani.com.br/emporio-armani/masculino/oculos/oculos-de-sol
+- https://www.armani.com.br/emporio-armani/feminino/oculos/oculos-de-sol
+- https://www.arnette.com/en-us
+- https://us.carreraworld.com
+- https://www.oculosworld.com.br/
+
+Priorize as especificações técnicas (tamanho da lente, ponte, haste, materiais e cores) encontradas nestes domínios.
+`;
 
 /**
  * Common Schema for Frame Extraction
@@ -30,8 +44,8 @@ const frameResponseSchema = {
       bridgeSize: { type: Type.NUMBER, description: "Ponte mm" },
       
       // New Fields in Schema
-      frontColor: { type: Type.STRING, description: "Cor da parte frontal" },
-      frontMaterial: { type: Type.STRING, description: "Material da frente (Acetato, Metal, etc)" },
+      frontColor: { type: Type.STRING, description: "Cor da armação" },
+      frontMaterial: { type: Type.STRING, description: "Material da armação (Acetato, Metal, etc)" },
       templeMaterial: { type: Type.STRING, description: "Material das hastes" },
       lensColor: { type: Type.STRING, description: "Cor das lentes (se aplicável)" },
       lensMaterial: { type: Type.STRING, description: "Material das lentes (Policarbonato, Cristal, etc)" },
@@ -87,48 +101,6 @@ const mapToSpectacleFrame = (extractedData: any[]): SpectacleFrame[] => {
 };
 
 /**
- * Uses Gemini to predict standard measurements for a given brand and model.
- */
-export const fetchFrameDetails = async (brand: string, modelCode: string): Promise<AIAutoFillData> => {
-  if (!brand || !modelCode) {
-    throw new Error("Brand and Model Code are required for AI lookup.");
-  }
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Atue como um especialista em óptica. Tente encontrar ou estimar as especificações técnicas padrão para a armação de óculos: Marca: "${brand}", Modelo: "${modelCode}".`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            lensWidth: { type: Type.NUMBER },
-            lensHeight: { type: Type.NUMBER },
-            templeLength: { type: Type.NUMBER },
-            bridgeSize: { type: Type.NUMBER },
-            gender: { type: Type.STRING, enum: [Gender.Male, Gender.Female, Gender.Unisex, Gender.Child] },
-            ean: { type: Type.STRING },
-            frontMaterial: { type: Type.STRING },
-            isPolarized: { type: Type.BOOLEAN },
-            description: { type: Type.STRING },
-          },
-        },
-      },
-    });
-
-    const text = response.text;
-    const data = text ? JSON.parse(text) : {};
-
-    return data;
-
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw new Error("Falha ao consultar IA para detalhes do modelo.");
-  }
-};
-
-/**
  * Parses raw text (from a PDF/Catalog/Excel) and extracts multiple spectacle frames.
  */
 export const parseFramesFromCatalog = async (rawText: string): Promise<SpectacleFrame[]> => {
@@ -137,6 +109,8 @@ export const parseFramesFromCatalog = async (rawText: string): Promise<Spectacle
       model: "gemini-2.5-flash",
       contents: `Você é um assistente de entrada de dados ópticos. Analise o seguinte texto extraído de um arquivo e extraia todos os óculos/armações encontrados.
       
+      ${REFERENCE_SITES_INSTRUCTION}
+      
       Dados do Arquivo:
       ${rawText.substring(0, 50000)} 
 
@@ -144,8 +118,8 @@ export const parseFramesFromCatalog = async (rawText: string): Promise<Spectacle
       1. Identifique Marca, Código do Modelo, CÓDIGO DA COR, Medidas.
       2. Identifique preços se houver.
       3. Identifique Materiais e se é Polarizado.
-      4. Estime o Gênero.
-      5. Se for CSV/Excel, ignore cabeçalhos irrelevantes.
+      4. Estime o Gênero com base no estilo da marca (ex: Vogue geralmente Feminino, Arnette geralmente Masculino).
+      5. IMPORTANTE: Se houver EAN/UPC no texto, use-o para validar as informações.
       `,
       config: {
         responseMimeType: "application/json",
@@ -181,6 +155,10 @@ export const parseFrameFromImage = async (base64Data: string, mimeType: string):
         {
           text: `Analise esta imagem. Ela pode ser uma foto de óculos com etiqueta, um print de catálogo ou uma página de produto.
           Extraia os dados técnicos do óculos presente na imagem.
+          
+          ${REFERENCE_SITES_INSTRUCTION}
+
+          - Tente ler códigos de barras (EAN) se visíveis na etiqueta.
           - Procure por códigos impressos na haste (ex: 55-18-140) para as medidas.
           - Procure por marca e código do modelo.
           - Identifique a cor.
@@ -214,6 +192,8 @@ export const parseFrameFromUrl = async (url: string): Promise<SpectacleFrame[]> 
       model: "gemini-2.5-flash",
       contents: `Analise o seguinte link ou texto de URL e tente extrair os dados do óculos a que ele se refere. 
       URL: ${url}
+      
+      ${REFERENCE_SITES_INSTRUCTION}
       
       Use seu conhecimento interno sobre a estrutura de URLs de marcas famosas ou dados de produtos conhecidos para inferir as especificações (Marca, Modelo, Cor, Medidas, Gênero, Materiais, Polarização).`,
       config: {

@@ -1,5 +1,5 @@
 {
-  "name": "óculos-da-loja",
+  "name": "gerenciador",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,9 @@
     "uuid": "^13.0.0",
     "@google/genai": "^1.30.0",
     "pdfjs-dist": "4.0.379",
-    "xlsx": "latest"
+    "xlsx": "latest",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

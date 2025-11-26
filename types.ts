@@ -5,6 +5,18 @@ export enum Gender {
   Child = 'Infantil'
 }
 
+export type UserRole = 'Gerente Geral' | 'Administrador' | 'Visitante';
+
+export interface UserAccount {
+  id: string;
+  username: string; // Login ID
+  password?: string; // Optional for security when passing around UI, but needed for login check
+  name: string; // Display Name
+  role: UserRole;
+  avatar: string | null;
+  createdAt: number;
+}
+
 export interface SpectacleFrame {
   id: string;
   name: string;           // Nome gerado (Modelo + Cor)
@@ -17,6 +29,7 @@ export interface SpectacleFrame {
   images: string[];       // Array de URLs (Base64) - Máximo 3
   isSold: boolean;        // Status de estoque (Vendido/Esgotado)
   category: 'inventory' | 'marketplace'; // Categoria do item
+  hasMarketplaceListing?: boolean; // Flag indicating if item was moved to marketplace
   
   // Dimensions
   lensWidth: number;      // Largura da lente (mm)
@@ -38,16 +51,4 @@ export interface SpectacleFrame {
   marketplacePrice: number; // (Deprecated/Unused but kept for type compatibility if needed)
 
   createdAt: number;
-}
-
-export interface AIAutoFillData {
-  lensWidth?: number;
-  lensHeight?: number;
-  templeLength?: number;
-  bridgeSize?: number;
-  gender?: Gender;
-  ean?: string;
-  description?: string;
-  frontMaterial?: string;
-  isPolarized?: boolean;
 }

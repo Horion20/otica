@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SpectacleFrame } from '../types';
+import { SpectacleFrame, UserRole } from '../types';
 
 interface FrameListProps {
   frames: SpectacleFrame[];
@@ -7,34 +7,15 @@ interface FrameListProps {
   onDelete: (id: string) => void;
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
+  userRole?: UserRole;
 }
 
-// Internal component to handle Logo loading with Fallback
+// Internal component to handle Brand display (Text Badge only)
 const BrandBadge: React.FC<{ brand: string }> = ({ brand }) => {
-  const [imageError, setImageError] = useState(false);
-
-  // Simple heuristic to guess domain for logo API
-  const cleanBrand = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const logoUrl = `https://logo.clearbit.com/${cleanBrand}.com?size=80`;
-
-  if (imageError) {
-    return (
-      <span className="inline-block px-2 py-0.5 bg-brand-50 text-brand-700 text-[10px] font-bold rounded uppercase tracking-wide border border-brand-100">
-        {brand}
-      </span>
-    );
-  }
-
   return (
-    <div className="h-6 flex items-center">
-      <img
-        src={logoUrl}
-        alt={brand}
-        className="h-full max-w-[80px] object-contain"
-        onError={() => setImageError(true)}
-        title={brand}
-      />
-    </div>
+    <span className="inline-block px-2 py-0.5 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 text-[10px] font-bold rounded uppercase tracking-wide border border-brand-100 dark:border-brand-800 whitespace-nowrap">
+      {brand}
+    </span>
   );
 };
 
@@ -45,8 +26,11 @@ const FrameCard: React.FC<{
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
   onZoom: (images: string[], initialIndex: number) => void;
-}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom }) => {
+  userRole?: UserRole;
+}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom, userRole }) => {
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
+
+  const canEdit = userRole !== 'Visitante';
 
   const formatMoney = (val: number) => {
     return val ? `R$ ${val.toFixed(2).replace('.', ',')}` : '-';
@@ -68,7 +52,7 @@ const FrameCard: React.FC<{
 
   return (
     <div 
-      className={`rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border overflow-hidden group flex flex-col relative ${frame.isSold ? 'bg-red-50 border-red-200' : 'bg-white border-slate-100'}`}
+      className={`rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border overflow-hidden group flex flex-col relative ${frame.isSold ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}
     >
       {frame.isSold && (
         <div className="absolute top-0 right-0 left-0 h-1 bg-red-400 z-10"></div>
@@ -87,7 +71,7 @@ const FrameCard: React.FC<{
         <div className="flex items-start gap-4 mb-4 relative z-10">
           {/* Image Carousel */}
           <div 
-            className={`w-20 h-20 rounded-lg flex-shrink-0 border relative overflow-hidden ${frame.isSold ? 'bg-red-100 border-red-200 opacity-70' : 'bg-slate-50 border-slate-100'}`}
+            className={`w-20 h-20 rounded-lg flex-shrink-0 border relative overflow-hidden ${frame.isSold ? 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-900/30 opacity-70' : 'bg-slate-50 dark:bg-slate-700 border-slate-100 dark:border-slate-600'}`}
           >
             <div 
                className={`w-full h-full flex items-center justify-center ${hasImages ? 'cursor-zoom-in' : ''}`}
@@ -96,7 +80,7 @@ const FrameCard: React.FC<{
                {hasImages ? (
                   <img src={images[currentImgIndex]} alt={frame.name} className={`w-full h-full object-cover ${frame.isSold ? 'grayscale' : ''}`} />
                ) : (
-                  <i className={`fas fa-glasses text-2xl ${frame.isSold ? 'text-red-300' : 'text-slate-300'}`}></i>
+                  <i className={`fas fa-glasses text-2xl ${frame.isSold ? 'text-red-300 dark:text-red-800' : 'text-slate-300 dark:text-slate-600'}`}></i>
                )}
             </div>
             
@@ -133,88 +117,90 @@ const FrameCard: React.FC<{
                 </div>
                 
                 {/* Actions */}
-                <div className="flex items-center gap-1 -mt-1 -mr-1">
-                    <button 
-                      onClick={() => onToggleStatus(frame)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
-                      title={frame.isSold ? "Marcar como Disponível" : "Marcar como Esgotado/Vendido"}
-                    >
-                      <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'}`}></i>
-                    </button>
-                    <button 
-                      onClick={() => onEdit(frame)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                      title="Editar"
-                    >
-                      <i className="fas fa-pencil-alt text-xs"></i>
-                    </button>
-                    <button 
-                      onClick={() => onDelete(frame.id)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="Apagar"
-                    >
-                      <i className="fas fa-trash text-xs"></i>
-                    </button>
-                </div>
+                {canEdit && (
+                  <div className="flex items-center gap-1 -mt-1 -mr-1">
+                      <button 
+                        onClick={() => onToggleStatus(frame)}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                        title={frame.isSold ? "Marcar como Disponível" : "Marcar como Esgotado/Vendido"}
+                      >
+                        <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'}`}></i>
+                      </button>
+                      <button 
+                        onClick={() => onEdit(frame)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+                        title="Editar"
+                      >
+                        <i className="fas fa-pencil-alt text-xs"></i>
+                      </button>
+                      <button 
+                        onClick={() => onDelete(frame.id)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        title="Apagar"
+                      >
+                        <i className="fas fa-trash text-xs"></i>
+                      </button>
+                  </div>
+                )}
             </div>
             
-            <h3 className="text-base font-bold text-slate-800 leading-tight truncate" title={frame.name || frame.modelCode}>
+            <h3 className="text-base font-bold text-slate-800 dark:text-white leading-tight truncate" title={frame.name || frame.modelCode}>
                 {frame.name || frame.modelCode}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">EAN: {frame.ean || 'N/A'}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">EAN: {frame.ean || 'N/A'}</p>
           </div>
         </div>
 
         {/* Details Grid: Gender | Size | Color */}
-        <div className={`rounded-lg p-3 grid grid-cols-3 gap-2 text-sm mb-4 ${frame.isSold ? 'bg-red-100/50' : 'bg-slate-50'}`}>
+        <div className={`rounded-lg p-3 grid grid-cols-3 gap-2 text-sm mb-4 ${frame.isSold ? 'bg-red-100/50 dark:bg-red-900/20' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
           <div className="flex flex-col">
-            <span className="text-slate-400 text-xs">Gênero</span>
-            <span className="font-medium text-slate-700 truncate" title={frame.gender}>{frame.gender}</span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs">Gênero</span>
+            <span className="font-medium text-slate-700 dark:text-slate-300 truncate" title={frame.gender}>{frame.gender}</span>
           </div>
           <div className="flex flex-col">
-             <span className="text-slate-400 text-xs">Tamanho</span>
-             <span className="font-medium text-slate-700 truncate">{frame.size || '-'}</span>
+             <span className="text-slate-400 dark:text-slate-500 text-xs">Tamanho</span>
+             <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{frame.size || '-'}</span>
           </div>
           <div className="flex flex-col">
-             <span className="text-slate-400 text-xs">Cor</span>
+             <span className="text-slate-400 dark:text-slate-500 text-xs">Cor</span>
              <div className="flex items-center gap-1.5 mt-0.5">
-               <i className="fas fa-palette text-slate-400 text-[10px]"></i>
-               <span className="font-medium text-slate-700 truncate" title="Código da Cor">{frame.colorCode || '-'}</span>
+               <i className="fas fa-palette text-slate-400 dark:text-slate-500 text-[10px]"></i>
+               <span className="font-medium text-slate-700 dark:text-slate-300 truncate" title="Código da Cor">{frame.colorCode || '-'}</span>
              </div>
           </div>
         </div>
 
         {/* Dimensions with FontAwesome Icons */}
-        <div className="grid grid-cols-4 gap-2 text-center mb-2 bg-white border border-slate-100 rounded-lg py-2">
+        <div className="grid grid-cols-4 gap-2 text-center mb-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg py-2">
           <div className="flex flex-col items-center gap-1" title="Largura da Lente">
-            <i className="fas fa-arrows-alt-h text-slate-400"></i>
-            <span className="text-sm font-bold text-slate-700">{frame.lensWidth}</span>
+            <i className="fas fa-arrows-alt-h text-slate-400 dark:text-slate-500"></i>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{frame.lensWidth}</span>
           </div>
           <div className="flex flex-col items-center gap-1" title="Altura da Lente">
-             <i className="fas fa-arrows-alt-v text-slate-400"></i>
-            <span className="text-sm font-bold text-slate-700">{frame.lensHeight}</span>
+             <i className="fas fa-arrows-alt-v text-slate-400 dark:text-slate-500"></i>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{frame.lensHeight}</span>
           </div>
           <div className="flex flex-col items-center gap-1" title="Ponte">
-            <i className="fas fa-archway text-slate-400"></i>
-            <span className="text-sm font-bold text-slate-700">{frame.bridgeSize}</span>
+            <i className="fas fa-archway text-slate-400 dark:text-slate-500"></i>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{frame.bridgeSize}</span>
           </div>
           <div className="flex flex-col items-center gap-1" title="Haste">
-            <i className="fas fa-ruler-horizontal text-slate-400"></i>
-            <span className="text-sm font-bold text-slate-700">{frame.templeLength}</span>
+            <i className="fas fa-ruler-horizontal text-slate-400 dark:text-slate-500"></i>
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{frame.templeLength}</span>
           </div>
         </div>
       </div>
       
       {/* Financial Footer */}
-      <div className={`border-t p-3 flex justify-between items-center ${frame.isSold ? 'bg-red-100/50 border-red-100' : 'bg-slate-50/50 border-slate-100'}`}>
+      <div className={`border-t dark:border-slate-700 p-3 flex justify-between items-center ${frame.isSold ? 'bg-red-100/50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30' : 'bg-slate-50/50 dark:bg-slate-700/30 border-slate-100'}`}>
          <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Custo</span>
-            <span className="text-xs text-slate-500">{formatMoney(frame.purchasePrice)}</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Custo</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{formatMoney(frame.purchasePrice)}</span>
          </div>
-         <div className="h-6 w-px bg-slate-200 mx-2"></div>
+         <div className="h-6 w-px bg-slate-200 dark:bg-slate-600 mx-2"></div>
          <div className="flex flex-col text-right">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Preço Recomendado</span>
-            <span className="text-sm font-bold text-brand-700">{formatMoney(frame.storePrice)}</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Preço Recomendado</span>
+            <span className="text-sm font-bold text-brand-700 dark:text-brand-400">{formatMoney(frame.storePrice)}</span>
          </div>
       </div>
     </div>
@@ -228,7 +214,10 @@ const FrameRow: React.FC<{
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
   onZoom: (images: string[], initialIndex: number) => void;
-}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom }) => {
+  userRole?: UserRole;
+}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom, userRole }) => {
+  const canEdit = userRole !== 'Visitante';
+
   const formatMoney = (val: number) => {
     return val ? `R$ ${val.toFixed(2).replace('.', ',')}` : '-';
   };
@@ -241,16 +230,16 @@ const FrameRow: React.FC<{
   const priceValue = frame.category === 'marketplace' ? frame.storePrice : frame.purchasePrice;
 
   return (
-    <div className={`p-3 rounded-xl border flex items-center gap-4 transition-all hover:shadow-md ${frame.isSold ? 'bg-red-50 border-red-200' : 'bg-white border-slate-100 hover:border-brand-200'}`}>
+    <div className={`p-3 rounded-xl border flex items-center gap-4 transition-all hover:shadow-md ${frame.isSold ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-brand-200 dark:hover:border-brand-800'}`}>
        {/* Image */}
        <div 
-         className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-200 flex-shrink-0 overflow-hidden cursor-pointer relative"
+         className="w-12 h-12 rounded-lg bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex-shrink-0 overflow-hidden cursor-pointer relative"
          onClick={() => hasImages && onZoom(images, 0)}
        >
          {hasImages ? (
             <img src={images[0]} alt={frame.name} className={`w-full h-full object-cover ${frame.isSold ? 'grayscale' : ''}`} />
          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-300">
+            <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-500">
               <i className="fas fa-glasses text-xs"></i>
             </div>
          )}
@@ -261,13 +250,13 @@ const FrameRow: React.FC<{
 
        {/* Info */}
        <div className="flex-1 min-w-0">
-          <h3 className={`text-sm font-bold truncate ${frame.isSold ? 'text-slate-600 line-through' : 'text-slate-800'}`}>
+          <h3 className={`text-sm font-bold truncate ${frame.isSold ? 'text-slate-600 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-white'}`}>
             {frame.name || frame.modelCode}
           </h3>
           <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{frame.brand}</p>
+            <BrandBadge brand={frame.brand} />
             {frame.colorCode && (
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+              <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-600">
                 <i className="fas fa-palette"></i>
                 <span>{frame.colorCode}</span>
               </div>
@@ -278,40 +267,42 @@ const FrameRow: React.FC<{
        {/* Actions & Price */}
        <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-             <span className="text-[10px] text-slate-400 uppercase font-semibold block">{priceLabel}</span>
-             <span className={`text-sm font-bold ${frame.isSold ? 'text-slate-500' : 'text-slate-700'}`}>
+             <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold block">{priceLabel}</span>
+             <span className={`text-sm font-bold ${frame.isSold ? 'text-slate-500 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>
                {formatMoney(priceValue)}
              </span>
           </div>
           
           {/* Mini Actions */}
-          <div className="flex items-center gap-1 pl-2 border-l border-slate-100">
-             <button 
-                onClick={() => onToggleStatus(frame)}
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-500 bg-red-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
-                title={frame.isSold ? "Marcar Disponível" : "Marcar Vendido"}
-             >
-                <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'} text-[10px]`}></i>
-             </button>
-             <button 
-                onClick={() => onEdit(frame)}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-             >
-                <i className="fas fa-pen text-[10px]"></i>
-             </button>
-             <button 
-                onClick={() => onDelete(frame.id)}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-             >
-                <i className="fas fa-trash text-[10px]"></i>
-             </button>
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-100 dark:border-slate-700">
+               <button 
+                  onClick={() => onToggleStatus(frame)}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-500 bg-red-100 dark:bg-red-900/30' : 'text-slate-300 dark:text-slate-500 hover:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                  title={frame.isSold ? "Marcar Disponível" : "Marcar Vendido"}
+               >
+                  <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'} text-[10px]`}></i>
+               </button>
+               <button 
+                  onClick={() => onEdit(frame)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+               >
+                  <i className="fas fa-pen text-[10px]"></i>
+               </button>
+               <button 
+                  onClick={() => onDelete(frame.id)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+               >
+                  <i className="fas fa-trash text-[10px]"></i>
+               </button>
+            </div>
+          )}
        </div>
     </div>
   );
 }
 
-export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete, onEdit, onToggleStatus }) => {
+export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete, onEdit, onToggleStatus, userRole }) => {
   const [zoomData, setZoomData] = useState<{ images: string[], index: number } | null>(null);
 
   const handleZoom = (images: string[], index: number) => {
@@ -336,12 +327,12 @@ export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete
 
   if (frames.length === 0) {
     return (
-      <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100 mt-4">
-        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+      <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mt-4 transition-colors">
+        <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 dark:text-slate-500">
           <i className="fas fa-glasses text-2xl"></i>
         </div>
-        <h3 className="text-slate-900 font-medium text-lg">Nenhum registro encontrado</h3>
-        <p className="text-slate-500">Adicione novos itens para visualizar.</p>
+        <h3 className="text-slate-900 dark:text-white font-medium text-lg">Nenhum registro encontrado</h3>
+        <p className="text-slate-500 dark:text-slate-400">Adicione novos itens para visualizar.</p>
       </div>
     );
   }
@@ -402,6 +393,7 @@ export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete
               onEdit={onEdit} 
               onToggleStatus={onToggleStatus}
               onZoom={handleZoom}
+              userRole={userRole}
             />
            ) : (
             <FrameRow 
@@ -411,6 +403,7 @@ export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onZoom={handleZoom}
+              userRole={userRole}
             />
            )
         ))}

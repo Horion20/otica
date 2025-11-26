@@ -3,7 +3,6 @@ import { Input } from './Input';
 import { Select } from './Select';
 import { SpectacleFrame, Gender } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { fetchFrameDetails } from '../services/geminiService';
 
 interface FrameFormProps {
   initialData?: SpectacleFrame;
@@ -37,7 +36,6 @@ const initialFormState = {
 export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState(initialFormState);
   const [error, setError] = useState<string | null>(null);
-  const [isAutoFilling, setIsAutoFilling] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeUploadIndex, setActiveUploadIndex] = useState<number>(0);
 
@@ -111,41 +109,10 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
     }));
   };
 
-  const handleAutoFill = async () => {
-    if (!formData.brand || !formData.modelCode) {
-        setError("Preencha Marca e Modelo para usar o Auto-Complete.");
-        return;
-    }
-    
-    setError(null);
-    setIsAutoFilling(true);
-
-    try {
-        const specs = await fetchFrameDetails(formData.brand, formData.modelCode);
-        setFormData(prev => {
-            return {
-                ...prev,
-                lensWidth: specs.lensWidth ? specs.lensWidth.toString() : prev.lensWidth,
-                lensHeight: specs.lensHeight ? specs.lensHeight.toString() : prev.lensHeight,
-                templeLength: specs.templeLength ? specs.templeLength.toString() : prev.templeLength,
-                bridgeSize: specs.bridgeSize ? specs.bridgeSize.toString() : prev.bridgeSize,
-                gender: specs.gender || prev.gender,
-                ean: specs.ean || prev.ean,
-                frontMaterial: specs.frontMaterial || prev.frontMaterial,
-                isPolarized: specs.isPolarized !== undefined ? (specs.isPolarized ? 'true' : 'false') : prev.isPolarized,
-            };
-        });
-    } catch (err) {
-        setError("Falha ao buscar detalhes online. Tente novamente.");
-    } finally {
-        setIsAutoFilling(false);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.brand || !formData.modelCode || !formData.gender) {
-      setError("Por favor preencha os campos obrigatórios.");
+      setError("Por favor preencha os campos obrigatórios (Marca, Modelo, Gênero).");
       return;
     }
 
@@ -193,30 +160,16 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100 animate-fadeIn">
+    <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 animate-fadeIn transition-colors">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <i className={`fas ${initialData ? 'fa-pen-to-square' : 'fa-glasses'} text-brand-600`}></i>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <i className={`fas ${initialData ? 'fa-pen-to-square' : 'fa-glasses'} text-brand-600 dark:text-brand-400`}></i>
           {initialData ? 'Editar Óculos' : 'Novo Registro'}
         </h2>
-        {!initialData && (
-             <button
-                type="button"
-                onClick={handleAutoFill}
-                disabled={isAutoFilling}
-                className="text-sm bg-brand-50 text-brand-700 px-3 py-1.5 rounded-lg border border-brand-100 font-bold flex items-center gap-2 hover:bg-brand-100 transition-colors disabled:opacity-50"
-             >
-                {isAutoFilling ? (
-                    <><i className="fas fa-circle-notch fa-spin"></i> Buscando...</>
-                ) : (
-                    <><i className="fas fa-magic"></i> Auto-Complete com IA</>
-                )}
-             </button>
-        )}
       </div>
 
       {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm flex items-center gap-2">
+        <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm flex items-center gap-2">
           <i className="fas fa-exclamation-circle"></i> {error}
         </div>
       )}
@@ -224,15 +177,15 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Image Upload Section (Left Column on Large Screens) */}
         <div className="lg:col-span-1">
-           <div className="flex items-center justify-between border-b pb-2 mb-4">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Imagens ({formData.images.length}/3)</h3>
+           <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">
+              <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Imagens ({formData.images.length}/3)</h3>
            </div>
            
            <div className="grid grid-cols-3 gap-2">
              {[0, 1, 2].map((index) => (
                <div key={index} className="relative aspect-square">
                  {formData.images[index] ? (
-                   <div className="w-full h-full relative group rounded-lg overflow-hidden border border-slate-200">
+                   <div className="w-full h-full relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600">
                       <img 
                         src={formData.images[index]} 
                         alt={`Slot ${index + 1}`} 
@@ -262,7 +215,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
                    </div>
                  ) : (
                    <div 
-                      className="w-full h-full border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors text-slate-300 hover:text-brand-500"
+                      className="w-full h-full border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 dark:hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-slate-700 transition-colors text-slate-300 dark:text-slate-500 hover:text-brand-500 dark:hover:text-brand-400"
                       onClick={() => handleTriggerUpload(index)}
                    >
                      <i className="fas fa-plus text-lg mb-1"></i>
@@ -272,7 +225,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
                </div>
              ))}
            </div>
-           <p className="text-xs text-slate-400 mt-2 text-center">Adicione até 3 fotos (Frente, Lateral, Detalhe).</p>
+           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 text-center">Adicione até 3 fotos (Frente, Lateral, Detalhe).</p>
            
            <input 
              type="file" 
@@ -288,7 +241,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
           
           {/* Identificação */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">Identificação</h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">Identificação</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Input
                 label="Marca"
@@ -317,7 +270,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
               <Input
                 label="Código EAN"
                 name="ean"
-                placeholder="789..."
+                placeholder="Ex: 8056597737229"
                 value={formData.ean}
                 onChange={handleChange}
                 icon={<i className="fas fa-barcode text-xs"></i>}
@@ -347,17 +300,17 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
 
           {/* New Section: Características & Materiais */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">Características & Materiais</h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">Características & Materiais</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                <Input
-                label="Cor da Frente"
+                label="Cor da Armação"
                 name="frontColor"
                 placeholder="Ex: Preto"
                 value={formData.frontColor}
                 onChange={handleChange}
                />
                <Input
-                label="Material da Frente"
+                label="Material da Armação"
                 name="frontMaterial"
                 placeholder="Ex: Acetato, Metal"
                 value={formData.frontMaterial}
@@ -399,7 +352,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
 
           {/* Technical Dimensions */}
           <div>
-             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">Dimensões Técnicas (mm)</h3>
+             <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">Dimensões Técnicas (mm)</h3>
              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                 <Input
                   label="Largura Lente"
@@ -442,7 +395,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
 
           {/* Financial Info */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">Financeiro</h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">Financeiro</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                <Input
                   label="Preço de Compra"
@@ -469,12 +422,12 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
         </div>
       </div>
 
-      <div className="mt-8 flex justify-end gap-3 border-t border-slate-100 pt-6">
+      <div className="mt-8 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-700 pt-6">
         {initialData && onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-3 rounded-lg text-slate-600 font-medium hover:bg-slate-100 transition-colors"
+            className="px-6 py-3 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             Cancelar
           </button>
