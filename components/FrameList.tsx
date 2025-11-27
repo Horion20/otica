@@ -7,7 +7,9 @@ interface FrameListProps {
   onDelete: (id: string) => void;
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
+  onPhysicalSale: (frame: SpectacleFrame) => void; // New Handler
   userRole?: UserRole;
+  currentCategory?: string; // New Prop for context
 }
 
 // Internal component to handle Brand display (Text Badge only)
@@ -19,15 +21,56 @@ const BrandBadge: React.FC<{ brand: string }> = ({ brand }) => {
   );
 };
 
+// Internal Helper for Platform Icon/Name
+const PlatformBadge: React.FC<{ platform?: string }> = ({ platform }) => {
+  if (!platform) return null;
+
+  let icon = 'fa-check-circle';
+  let color = 'text-slate-500';
+  let label = 'Vendido';
+  let bgColor = 'bg-slate-100 dark:bg-slate-700';
+
+  if (platform === 'mercadolivre') {
+    icon = 'fa-handshake';
+    color = 'text-[#2d3277]';
+    label = 'Mercado Livre';
+    bgColor = 'bg-[#ffe600]';
+  } else if (platform === 'shopee') {
+    icon = 'fa-shopping-bag';
+    color = 'text-white';
+    label = 'Shopee';
+    bgColor = 'bg-[#ee4d2d]';
+  } else if (platform === 'amazon') {
+    icon = 'fa-amazon';
+    color = 'text-white';
+    label = 'Amazon';
+    bgColor = 'bg-[#232f3e]';
+  } else if (platform === 'inventory') {
+     icon = 'fa-store';
+     label = 'Loja Física';
+     bgColor = 'bg-slate-200 dark:bg-slate-700';
+     color = 'text-slate-700 dark:text-slate-300';
+  }
+
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${bgColor} ${color} border border-black/5`}>
+       <i className={`fas ${icon} ${platform === 'amazon' ? 'fab' : ''}`}></i>
+       {label}
+    </div>
+  );
+};
+
 // Internal Card Component (Grid View)
 const FrameCard: React.FC<{ 
   frame: SpectacleFrame; 
   onDelete: (id: string) => void;
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
+  onPhysicalSale: (frame: SpectacleFrame) => void;
   onZoom: (images: string[], initialIndex: number) => void;
   userRole?: UserRole;
-}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom, userRole }) => {
+  currentCategory?: string;
+}> = ({ frame, onDelete, onEdit, onToggleStatus, onPhysicalSale, onZoom, userRole, currentCategory }) => {
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
   const canEdit = userRole !== 'Visitante';
@@ -49,6 +92,18 @@ const FrameCard: React.FC<{
     e.stopPropagation();
     setCurrentImgIndex((prev) => (prev - 1 + images.length) % images.length);
   };
+
+  // Determine Main Sell Button Tooltip
+  let sellTooltip = "Vender";
+  if (!frame.isSold) {
+      if (['mercadolivre', 'shopee', 'amazon'].includes(currentCategory || '')) {
+          sellTooltip = `Vender em ${currentCategory} (1 un)`;
+      } else {
+          sellTooltip = "Registrar Venda (Escolher Local)";
+      }
+  } else {
+      sellTooltip = "Marcar como Disponível (Restaurar)";
+  }
 
   return (
     <div 
@@ -114,17 +169,38 @@ const FrameCard: React.FC<{
             <div className="flex justify-between items-start">
                 <div className="flex flex-wrap gap-2 mb-1 items-center h-6">
                   <BrandBadge brand={frame.brand} />
+                  {/* Quantity Badge */}
+                  {!frame.isSold && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold rounded border border-slate-200 dark:border-slate-600" title="Quantidade em Estoque">
+                      <i className="fas fa-layer-group text-[8px]"></i> {frame.quantity}
+                    </span>
+                  )}
+                  {/* Sold Platform Badge */}
+                  {frame.isSold && frame.soldPlatform && (
+                     <PlatformBadge platform={frame.soldPlatform} />
+                  )}
                 </div>
                 
                 {/* Actions */}
                 {canEdit && (
                   <div className="flex items-center gap-1 -mt-1 -mr-1">
+                      {/* Physical Sale Button (Only if NOT sold) */}
+                      {!frame.isSold && (
+                          <button 
+                            onClick={() => onPhysicalSale(frame)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                            title="Venda Física (Balcão)"
+                          >
+                            <i className="fas fa-cash-register text-xs"></i>
+                          </button>
+                      )}
+
                       <button 
                         onClick={() => onToggleStatus(frame)}
                         className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                        title={frame.isSold ? "Marcar como Disponível" : "Marcar como Esgotado/Vendido"}
+                        title={sellTooltip}
                       >
-                        <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'}`}></i>
+                        <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-minus-square'}`}></i>
                       </button>
                       <button 
                         onClick={() => onEdit(frame)}
@@ -213,9 +289,11 @@ const FrameRow: React.FC<{
   onDelete: (id: string) => void;
   onEdit: (frame: SpectacleFrame) => void;
   onToggleStatus: (frame: SpectacleFrame) => void;
+  onPhysicalSale: (frame: SpectacleFrame) => void;
   onZoom: (images: string[], initialIndex: number) => void;
   userRole?: UserRole;
-}> = ({ frame, onDelete, onEdit, onToggleStatus, onZoom, userRole }) => {
+  currentCategory?: string;
+}> = ({ frame, onDelete, onEdit, onToggleStatus, onPhysicalSale, onZoom, userRole, currentCategory }) => {
   const canEdit = userRole !== 'Visitante';
 
   const formatMoney = (val: number) => {
@@ -226,8 +304,21 @@ const FrameRow: React.FC<{
   const hasImages = images.length > 0;
   
   // Decide which price to show based on Category
-  const priceLabel = frame.category === 'marketplace' ? 'PREÇO' : 'CUSTO';
-  const priceValue = frame.category === 'marketplace' ? frame.storePrice : frame.purchasePrice;
+  const isMarketplace = ['marketplace', 'mercadolivre', 'shopee', 'amazon'].includes(frame.category);
+  const priceLabel = isMarketplace ? 'PREÇO' : 'CUSTO';
+  const priceValue = isMarketplace ? frame.storePrice : frame.purchasePrice;
+
+  // Determine Main Sell Button Tooltip
+  let sellTooltip = "Vender";
+  if (!frame.isSold) {
+      if (['mercadolivre', 'shopee', 'amazon'].includes(currentCategory || '')) {
+          sellTooltip = `Vender em ${currentCategory} (1 un)`;
+      } else {
+          sellTooltip = "Registrar Venda";
+      }
+  } else {
+      sellTooltip = "Marcar como Disponível (Restaurar)";
+  }
 
   return (
     <div className={`p-3 rounded-xl border flex items-center gap-4 transition-all hover:shadow-md ${frame.isSold ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-brand-200 dark:hover:border-brand-800'}`}>
@@ -253,13 +344,23 @@ const FrameRow: React.FC<{
           <h3 className={`text-sm font-bold truncate ${frame.isSold ? 'text-slate-600 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-white'}`}>
             {frame.name || frame.modelCode}
           </h3>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <BrandBadge brand={frame.brand} />
             {frame.colorCode && (
               <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-600">
                 <i className="fas fa-palette"></i>
                 <span>{frame.colorCode}</span>
               </div>
+            )}
+            {!frame.isSold && (
+                <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600">
+                    <i className="fas fa-layer-group"></i>
+                    <span>{frame.quantity}</span>
+                </div>
+            )}
+            {/* Sold Platform Badge Row View */}
+            {frame.isSold && frame.soldPlatform && (
+                <PlatformBadge platform={frame.soldPlatform} />
             )}
           </div>
        </div>
@@ -276,12 +377,22 @@ const FrameRow: React.FC<{
           {/* Mini Actions */}
           {canEdit && (
             <div className="flex items-center gap-1 pl-2 border-l border-slate-100 dark:border-slate-700">
+               {/* Physical Sale Button (Only if NOT sold) */}
+               {!frame.isSold && (
+                   <button 
+                     onClick={() => onPhysicalSale(frame)}
+                     className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                     title="Venda Física"
+                   >
+                     <i className="fas fa-cash-register text-[10px]"></i>
+                   </button>
+               )}
                <button 
                   onClick={() => onToggleStatus(frame)}
                   className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${frame.isSold ? 'text-red-500 bg-red-100 dark:bg-red-900/30' : 'text-slate-300 dark:text-slate-500 hover:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                  title={frame.isSold ? "Marcar Disponível" : "Marcar Vendido"}
+                  title={sellTooltip}
                >
-                  <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-box'} text-[10px]`}></i>
+                  <i className={`fas ${frame.isSold ? 'fa-box-open' : 'fa-minus-square'} text-[10px]`}></i>
                </button>
                <button 
                   onClick={() => onEdit(frame)}
@@ -302,7 +413,7 @@ const FrameRow: React.FC<{
   );
 }
 
-export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete, onEdit, onToggleStatus, userRole }) => {
+export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete, onEdit, onToggleStatus, onPhysicalSale, userRole, currentCategory }) => {
   const [zoomData, setZoomData] = useState<{ images: string[], index: number } | null>(null);
 
   const handleZoom = (images: string[], index: number) => {
@@ -392,8 +503,10 @@ export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete
               onDelete={onDelete} 
               onEdit={onEdit} 
               onToggleStatus={onToggleStatus}
+              onPhysicalSale={onPhysicalSale}
               onZoom={handleZoom}
               userRole={userRole}
+              currentCategory={currentCategory}
             />
            ) : (
             <FrameRow 
@@ -402,8 +515,10 @@ export const FrameList: React.FC<FrameListProps> = ({ frames, viewMode, onDelete
               onDelete={onDelete}
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
+              onPhysicalSale={onPhysicalSale}
               onZoom={handleZoom}
               userRole={userRole}
+              currentCategory={currentCategory}
             />
            )
         ))}

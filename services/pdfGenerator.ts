@@ -27,28 +27,50 @@ export const generateFramesPDF = (frames: SpectacleFrame[], title: string, categ
 
   // 4. Totais
   const totalItems = frames.length;
+  // Calculate total value based on quantity sold (if sold list) or current quantity (if inventory)
   const totalValue = frames.reduce((acc, frame) => {
-    return acc + (category === 'marketplace' ? frame.storePrice : frame.purchasePrice);
+    const qty = frame.isSold ? (frame.soldQuantity || 1) : frame.quantity;
+    const price = category === 'marketplace' || category === 'sold' ? frame.storePrice : frame.purchasePrice;
+    return acc + (price * qty);
   }, 0);
+
+  // Calculate total volume of items (sum of quantities)
+  const totalVolume = frames.reduce((acc, frame) => acc + (frame.isSold ? (frame.soldQuantity || 1) : frame.quantity), 0);
 
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
-  doc.text(`Itens Listados: ${totalItems}`, 14, 45);
+  doc.text(`Registros: ${totalItems} | Volume Total (Qtd): ${totalVolume}`, 14, 45);
   doc.text(`Valor Total Estimado: ${totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 14, 51);
 
   // 5. Preparar dados da tabela
-  const tableColumn = ["Marca", "Modelo", "Cor", "Tamanho", "EAN", category === 'marketplace' ? "Venda" : "Custo", "Status"];
+  const tableColumn = ["Qtd", "Marca", "Modelo", "Cor", "EAN", category === 'marketplace' || category === 'sold' ? "Venda" : "Custo", "Status/Origem"];
   const tableRows: any[] = [];
 
   frames.forEach(frame => {
+    // Determine quantity to show
+    const qty = frame.isSold ? (frame.soldQuantity || 1) : frame.quantity;
+    
+    // Determine status text
+    let statusText = frame.isSold ? 'VENDIDO' : 'DISPONÍVEL';
+    if (frame.isSold && frame.soldPlatform) {
+        // Map platform code to nice name
+        const map: any = { 
+            'inventory': 'LOJA FÍSICA', 
+            'mercadolivre': 'M. LIVRE', 
+            'shopee': 'SHOPEE', 
+            'amazon': 'AMAZON' 
+        };
+        statusText = `VENDIDO (${map[frame.soldPlatform] || frame.soldPlatform})`;
+    }
+
     const frameData = [
+      qty.toString(),
       frame.brand,
       frame.modelCode,
       frame.colorCode || '-',
-      frame.size || '-',
       frame.ean || '-',
-      (category === 'marketplace' ? frame.storePrice : frame.purchasePrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-      frame.isSold ? 'VENDIDO' : 'DISPONÍVEL'
+      (category === 'marketplace' || category === 'sold' ? frame.storePrice : frame.purchasePrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      statusText
     ];
     tableRows.push(frameData);
   });
@@ -66,18 +88,19 @@ export const generateFramesPDF = (frames: SpectacleFrame[], title: string, categ
       halign: 'center'
     },
     styles: {
-      fontSize: 9,
-      cellPadding: 3,
+      fontSize: 8,
+      cellPadding: 2,
       valign: 'middle'
     },
     columnStyles: {
-      0: { fontStyle: 'bold' }, // Marca
+      0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 }, // Qtd
+      1: { fontStyle: 'bold' }, // Marca
       5: { halign: 'right', fontStyle: 'bold' }, // Preço
-      6: { halign: 'center' } // Status
+      6: { halign: 'center', fontSize: 7 } // Status
     },
     didParseCell: (data: any) => {
         // Estilizar status vendido em vermelho
-        if (data.column.index === 6 && data.cell.raw === 'VENDIDO') {
+        if (data.column.index === 6 && data.cell.raw && data.cell.raw.toString().startsWith('VENDIDO')) {
             data.cell.styles.textColor = [220, 38, 38];
             data.cell.styles.fontStyle = 'bold';
         }

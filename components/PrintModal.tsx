@@ -16,14 +16,20 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
   const [filterBrand, setFilterBrand] = useState<string>('');
   const [filterType, setFilterType] = useState<'all' | 'sun' | 'optical'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'sold'>('available');
+  
+  // New Filters
+  const [filterChannel, setFilterChannel] = useState<'all' | 'online' | 'physical'>('all');
+  const [filterMarketplace, setFilterMarketplace] = useState<string>('all');
 
   // Reset filters when modal opens
   useEffect(() => {
     if (isOpen) {
       setFilterBrand('');
       setFilterType('all');
-      // Default to 'available' if coming from inventory/ML to keep view clean,
-      // but if coming from 'sold' tab, default to 'sold'.
+      setFilterChannel('all');
+      setFilterMarketplace('all');
+      
+      // Default Status based on category
       setFilterStatus(category === 'sold' ? 'sold' : 'available');
     }
   }, [isOpen, category]);
@@ -43,10 +49,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
       }
 
       // 2. Type Filter (Heuristic)
-      // Solar: Has lensColor OR isPolarized
-      // Optical: No lensColor AND not Polarized
       const isSun = (frame.lensColor && frame.lensColor.trim() !== '') || frame.isPolarized;
-      
       if (filterType === 'sun' && !isSun) return false;
       if (filterType === 'optical' && isSun) return false;
 
@@ -54,9 +57,21 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
       if (filterStatus === 'available' && frame.isSold) return false;
       if (filterStatus === 'sold' && !frame.isSold) return false;
 
+      // 4. Channel Filter (Only applies if Sold or we want to filter by origin)
+      if (filterChannel !== 'all' && frame.isSold && frame.soldPlatform) {
+          const isPhysical = frame.soldPlatform === 'inventory';
+          if (filterChannel === 'physical' && !isPhysical) return false;
+          if (filterChannel === 'online' && isPhysical) return false;
+      }
+
+      // 5. Marketplace Filter
+      if (filterMarketplace !== 'all' && frame.isSold && frame.soldPlatform) {
+          if (frame.soldPlatform !== filterMarketplace) return false;
+      }
+
       return true;
     });
-  }, [frames, filterBrand, filterType, filterStatus]);
+  }, [frames, filterBrand, filterType, filterStatus, filterChannel, filterMarketplace]);
 
   if (!isOpen) return null;
 
@@ -65,7 +80,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
         const doc = generateFramesPDF(filteredFrames, title, category);
         doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e) {
-        alert("Erro ao gerar PDF. Verifique se o navegador bloqueou o download.");
+        alert("Erro ao gerar PDF.");
         console.error(e);
     }
   };
@@ -83,7 +98,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
@@ -107,7 +122,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                 <i className="fas fa-filter"></i> Filtrar Itens
               </h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                  {/* Brand Filter */}
                  <div className="flex flex-col">
                     <label className="text-[10px] text-slate-400 font-bold mb-1">MARCA</label>
@@ -122,7 +137,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
                           <option key={brand} value={brand}>{brand}</option>
                         ))}
                       </select>
-                      <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
                     </div>
                  </div>
 
@@ -135,16 +149,15 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value as any)}
                       >
-                        <option value="available">Disponíveis (Em Estoque)</option>
+                        <option value="available">Disponíveis</option>
                         <option value="sold">Vendidos / Esgotados</option>
-                        <option value="all">Todos (Histórico Completo)</option>
+                        <option value="all">Todos</option>
                       </select>
-                      <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
                     </div>
                  </div>
 
                  {/* Type Filter */}
-                 <div className="flex flex-col col-span-2">
+                 <div className="flex flex-col">
                     <label className="text-[10px] text-slate-400 font-bold mb-1">TIPO (SOL / GRAU)</label>
                     <div className="relative">
                       <select 
@@ -153,12 +166,49 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
                         onChange={(e) => setFilterType(e.target.value as any)}
                       >
                         <option value="all">Todos</option>
-                        <option value="sun">Solar (Com Lente)</option>
-                        <option value="optical">Grau (Sem Lente)</option>
+                        <option value="sun">Solar</option>
+                        <option value="optical">Grau</option>
                       </select>
-                      <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
                     </div>
                  </div>
+
+                 {/* New Channel Filter (Only show if filtering SOLD or ALL) */}
+                 {(filterStatus !== 'available') && (
+                     <div className="flex flex-col">
+                        <label className="text-[10px] text-slate-400 font-bold mb-1">CANAL (ONLINE/FÍSICO)</label>
+                        <div className="relative">
+                          <select 
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-brand-200 outline-none appearance-none"
+                            value={filterChannel}
+                            onChange={(e) => setFilterChannel(e.target.value as any)}
+                          >
+                            <option value="all">Todos os Canais</option>
+                            <option value="physical">Loja Física</option>
+                            <option value="online">Venda Online</option>
+                          </select>
+                        </div>
+                     </div>
+                 )}
+
+                 {/* New Marketplace Filter (Only show if filtering SOLD or ALL) */}
+                 {(filterStatus !== 'available') && (
+                     <div className="flex flex-col col-span-2">
+                        <label className="text-[10px] text-slate-400 font-bold mb-1">PLATAFORMA ESPECÍFICA</label>
+                        <div className="relative">
+                          <select 
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-brand-200 outline-none appearance-none"
+                            value={filterMarketplace}
+                            onChange={(e) => setFilterMarketplace(e.target.value)}
+                          >
+                            <option value="all">Todas as Plataformas</option>
+                            <option value="inventory">Loja Física (Balcão)</option>
+                            <option value="mercadolivre">Mercado Livre</option>
+                            <option value="shopee">Shopee</option>
+                            <option value="amazon">Amazon</option>
+                          </select>
+                        </div>
+                     </div>
+                 )}
               </div>
            </div>
 
@@ -168,7 +218,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
                  <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold">
                     {filteredFrames.length}
                  </div>
-                 <p className="text-xs text-brand-800 font-bold uppercase tracking-wider">Itens Selecionados</p>
+                 <div className="flex flex-col">
+                    <p className="text-xs text-brand-800 font-bold uppercase tracking-wider">Itens</p>
+                    <p className="text-[10px] text-brand-600">
+                        Qtd Total: {filteredFrames.reduce((acc, f) => acc + (f.isSold ? (f.soldQuantity||1) : f.quantity), 0)}
+                    </p>
+                 </div>
               </div>
            </div>
 
@@ -176,7 +231,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
            <div className="border rounded-xl overflow-hidden flex flex-col h-64">
               <div className="bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 uppercase flex justify-between flex-shrink-0">
                 <span>Pré-visualização</span>
-                <span>{filteredFrames.length} de {frames.length}</span>
+                <span>{filteredFrames.length} registros</span>
               </div>
               <div className="overflow-y-auto bg-white divide-y divide-slate-100 flex-1">
                  {filteredFrames.length === 0 ? (
@@ -188,20 +243,21 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
                    filteredFrames.map(frame => (
                      <div key={frame.id} className="px-4 py-2 flex justify-between items-center text-sm hover:bg-slate-50">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${frame.isSold ? 'bg-red-400' : 'bg-green-400'}`}></span>
+                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${frame.isSold ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                             {frame.isSold ? (frame.soldQuantity || 1) : frame.quantity}
+                           </span>
                            <span className={`truncate pr-2 font-medium ${frame.isSold ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                              {frame.brand} <span className="text-slate-500 font-normal">{frame.modelCode}</span>
                            </span>
                         </div>
                         <div className="flex items-center gap-2">
-                           {/* Icon indicator for Type */}
-                           {((frame.lensColor && frame.lensColor.trim() !== '') || frame.isPolarized) ? (
-                              <i className="fas fa-sun text-orange-400 text-xs" title="Solar"></i>
-                           ) : (
-                              <i className="fas fa-glasses text-blue-400 text-xs" title="Grau"></i>
+                           {frame.isSold && frame.soldPlatform && (
+                               <span className="text-[9px] uppercase font-bold text-slate-400 bg-slate-100 px-1 rounded">
+                                   {frame.soldPlatform.substring(0,3)}
+                               </span>
                            )}
                            <span className="font-mono text-xs text-slate-400 ml-2">
-                             {(category === 'marketplace' ? frame.storePrice : frame.purchasePrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                             {(category === 'marketplace' || category === 'sold' ? frame.storePrice : frame.purchasePrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                            </span>
                         </div>
                      </div>
@@ -220,7 +276,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
           >
             <i className="fas fa-file-pdf text-xl mb-1 group-hover:scale-110 transition-transform"></i>
             <span>Salvar PDF</span>
-            <span className="text-[10px] font-normal text-slate-400">Baixar para o computador</span>
+            <span className="text-[10px] font-normal text-slate-400">Baixar</span>
           </button>
 
           <button 
@@ -230,7 +286,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, frames,
           >
             <i className="fas fa-print text-xl mb-1"></i>
             <span>Imprimir</span>
-            <span className="text-[10px] font-normal text-brand-200 opacity-80">Enviar para impressora</span>
+            <span className="text-[10px] font-normal text-brand-200 opacity-80">Enviar</span>
           </button>
         </div>
 

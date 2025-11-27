@@ -18,6 +18,7 @@ const initialFormState = {
   ean: '',
   gender: '' as Gender,
   images: [] as string[],
+  quantity: '1',
   lensWidth: '',
   lensHeight: '',
   templeLength: '',
@@ -50,6 +51,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
         ean: initialData.ean,
         gender: initialData.gender,
         images: initialData.images || [],
+        quantity: initialData.quantity ? initialData.quantity.toString() : '1',
         lensWidth: initialData.lensWidth.toString(),
         lensHeight: initialData.lensHeight.toString(),
         templeLength: initialData.templeLength.toString(),
@@ -130,6 +132,7 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
       gender: formData.gender as Gender,
       images: formData.images,
       isSold: initialData ? initialData.isSold : false, // Preserve status or default to false
+      quantity: Number(formData.quantity) || 1,
       category: initialData ? initialData.category : 'inventory', // Preserve category or default to inventory
       
       lensWidth: Number(formData.lensWidth) || 0,
@@ -275,13 +278,25 @@ export const FrameForm: React.FC<FrameFormProps> = ({ initialData, onSave, onCan
                 onChange={handleChange}
                 icon={<i className="fas fa-barcode text-xs"></i>}
               />
-              <Input
-                label="Tamanho (Ref)"
-                name="size"
-                placeholder="Ex: M, 55"
-                value={formData.size}
-                onChange={handleChange}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Tamanho (Ref)"
+                    name="size"
+                    placeholder="Ex: M, 55"
+                    value={formData.size}
+                    onChange={handleChange}
+                  />
+                  <Input
+                    label="Quantidade"
+                    name="quantity"
+                    type="number"
+                    placeholder="1"
+                    value={formData.quantity}
+                    onChange={handleChange}
+                    icon={<i className="fas fa-layer-group text-xs"></i>}
+                    required
+                  />
+              </div>
               <Select
                 label="Gênero"
                 name="gender"

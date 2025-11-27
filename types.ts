@@ -28,9 +28,15 @@ export interface SpectacleFrame {
   gender: Gender;         // Genero
   images: string[];       // Array de URLs (Base64) - Máximo 3
   isSold: boolean;        // Status de estoque (Vendido/Esgotado)
-  category: 'inventory' | 'marketplace'; // Categoria do item
+  quantity: number;       // Quantidade em estoque (Atual)
+  category: 'inventory' | 'marketplace' | 'mercadolivre' | 'shopee' | 'amazon'; // Categoria do item
   hasMarketplaceListing?: boolean; // Flag indicating if item was moved to marketplace
   
+  // Sold Info
+  soldPlatform?: string;  // Where the sale happened (inventory, amazon, etc)
+  soldQuantity?: number;  // How many were sold in this specific transaction
+  soldAt?: number;        // Timestamp of sale
+
   // Dimensions
   lensWidth: number;      // Largura da lente (mm)
   lensHeight: number;     // Altura da lente (mm)

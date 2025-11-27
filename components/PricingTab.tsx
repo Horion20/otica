@@ -3,16 +3,18 @@ import { SpectacleFrame } from '../types';
 
 interface PricingTabProps {
   frames: SpectacleFrame[];
-  onMoveToMarketplace: (frame: SpectacleFrame, newPrice: number) => void;
+  onMoveToMarketplace: (frame: SpectacleFrame, newPrice: number, target: 'mercadolivre' | 'shopee' | 'amazon' | 'all') => void;
 }
 
 export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketplace }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFrame, setSelectedFrame] = useState<SpectacleFrame | null>(null);
   
-  // Strategy 1: Percentage Adder
+  // Strategy 1: Percentage Adder (Taxa da Loja)
   const [percentage, setPercentage] = useState<number>(10); 
-  const SHIPPING_COST = 26.94;
+  
+  // Shipping Cost (Frete Manual) - Default 26.94, but editable
+  const [shippingCost, setShippingCost] = useState<number>(26.94);
 
   // Strategy 2: Markup Multiplier
   const [markup, setMarkup] = useState<number>(2.0);
@@ -49,11 +51,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
   const costPrice = selectedFrame?.purchasePrice || 0;
   const markupValue = costPrice * markup;
   const percentageAddon = markupValue * (percentage / 100);
-  const calculatedPrice = markupValue + percentageAddon + SHIPPING_COST;
+  const calculatedPrice = markupValue + percentageAddon + shippingCost;
 
-  const handleMove = () => {
+  const handleMove = (target: 'mercadolivre' | 'shopee' | 'amazon' | 'all') => {
     if (selectedFrame) {
-      onMoveToMarketplace(selectedFrame, calculatedPrice);
+      onMoveToMarketplace(selectedFrame, calculatedPrice, target);
     }
   };
 
@@ -175,12 +177,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
                 </div>
               </div>
 
-              {/* 2. PERCENTAGE SLIDER */}
+              {/* 2. PERCENTAGE SLIDER (TAXA DA LOJA) */}
               <div className="animate-fadeIn">
                 <div className="flex justify-between items-end mb-4">
                     <label className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-2">
                         <span className="w-5 h-5 bg-slate-800 dark:bg-slate-600 text-white rounded-full flex items-center justify-center text-xs">2</span>
-                        Acréscimo (%)
+                        Taxa da Loja (%)
                     </label>
                     <span className="text-2xl font-black text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/30 px-3 py-1 rounded-lg border border-brand-100 dark:border-brand-800">
                         {percentage}%
@@ -189,17 +191,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
                 
                 <input 
                     type="range" 
-                    min="1" 
-                    max="25" 
+                    min="0" 
+                    max="50" 
                     step="1"
                     value={percentage} 
                     onChange={(e) => setPercentage(Number(e.target.value))}
                     className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-600 dark:accent-brand-500 hover:accent-brand-500 transition-all"
                 />
                 <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-2 font-medium">
-                    <span>1%</span>
-                    <span>12%</span>
+                    <span>0%</span>
                     <span>25%</span>
+                    <span>50%</span>
                 </div>
               </div>
 
@@ -212,24 +214,30 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
                       <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatMoney(markupValue)}</span>
                   </div>
 
-                  {/* Percentage Addition */}
+                  {/* Percentage Addition (Taxa da Loja) */}
                   <div className="flex justify-between items-center mb-3">
                       <span className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <i className="fas fa-plus text-[10px]"></i> {percentage}% Acréscimo
+                          <i className="fas fa-plus text-[10px]"></i> Taxa da Loja ({percentage}%)
                       </span>
                       <span className="text-sm font-bold text-green-600 dark:text-green-400">
                           {formatMoney(percentageAddon)}
                       </span>
                   </div>
 
-                  {/* Shipping */}
+                  {/* Shipping (EDITABLE) */}
                   <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200 dark:border-slate-600 border-dashed">
                       <span className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <i className="fas fa-plus text-[10px]"></i> Frete Fixo
+                          <i className="fas fa-plus text-[10px]"></i> Frete (R$)
                       </span>
-                      <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                          {formatMoney(SHIPPING_COST)}
-                      </span>
+                      <div className="flex items-center gap-1">
+                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$</span>
+                          <input
+                            type="number"
+                            value={shippingCost}
+                            onChange={(e) => setShippingCost(Math.max(0, Number(e.target.value)))}
+                            className="w-20 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded px-2 py-1 text-sm font-bold text-orange-600 dark:text-orange-400 text-right focus:outline-none focus:ring-1 focus:ring-orange-300"
+                          />
+                      </div>
                   </div>
                  
                  {/* Total */}
@@ -237,7 +245,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
                     <div className="flex flex-col">
                         <span className="text-base font-bold text-slate-800 dark:text-white uppercase">Preço Final</span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            (Base + % + Frete)
+                            (Base + Taxa + Frete)
                         </span>
                     </div>
                     <div className="flex flex-col items-end">
@@ -248,17 +256,45 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
                  </div>
               </div>
 
-              {/* Action */}
-              <button
-                onClick={handleMove}
-                className="w-full py-4 bg-[#ffe600] text-[#2d3277] rounded-xl font-bold text-lg hover:bg-[#ffe600]/80 transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
-              >
-                <i className="fas fa-exchange-alt"></i>
-                Mover para Mercado Livre
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                  <button
+                    onClick={() => handleMove('all')}
+                    className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold text-lg hover:bg-purple-700 transition-all active:scale-[0.98] shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2"
+                  >
+                    <i className="fas fa-globe"></i>
+                    Registrar em Todos (Clone)
+                  </button>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                      <button
+                        onClick={() => handleMove('mercadolivre')}
+                        className="py-3 bg-[#ffe600] text-[#2d3277] rounded-xl font-bold hover:bg-[#ffe600]/80 transition-all active:scale-[0.98] shadow-sm flex flex-col items-center justify-center gap-1 text-sm leading-tight"
+                      >
+                        <i className="fas fa-handshake"></i>
+                        Mercado Livre
+                      </button>
+
+                      <button
+                        onClick={() => handleMove('shopee')}
+                        className="py-3 bg-[#ee4d2d] text-white rounded-xl font-bold hover:bg-[#d03e1f] transition-all active:scale-[0.98] shadow-sm flex flex-col items-center justify-center gap-1 text-sm leading-tight"
+                      >
+                        <i className="fas fa-shopping-bag"></i>
+                        Shopee
+                      </button>
+
+                      <button
+                        onClick={() => handleMove('amazon')}
+                        className="py-3 bg-[#232f3e] text-white rounded-xl font-bold hover:bg-[#131921] transition-all active:scale-[0.98] shadow-sm flex flex-col items-center justify-center gap-1 text-sm leading-tight"
+                      >
+                        <i className="fab fa-amazon"></i>
+                        Amazon
+                      </button>
+                  </div>
+              </div>
               
               <p className="text-xs text-center text-slate-400 dark:text-slate-500 mt-2">
-                Move o item do inventário para a aba Mercado Livre com o novo preço.
+                "Registrar em Todos" cria cópias independentes do item para cada plataforma.
               </p>
             </div>
 

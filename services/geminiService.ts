@@ -78,6 +78,7 @@ const mapToSpectacleFrame = (extractedData: any[]): SpectacleFrame[] => {
       gender: item.gender as Gender,
       images: [], 
       isSold: false, 
+      quantity: 1, // Default quantity
       category: 'inventory',
       lensWidth: Number(item.lensWidth) || 0,
       lensHeight: Number(item.lensHeight) || 0,
