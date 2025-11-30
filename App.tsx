@@ -10,8 +10,10 @@ import { PrintModal } from './components/PrintModal';
 import { ProfileModal } from './components/ProfileModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { SaleModal } from './components/SaleModal';
-import { SpectacleFrame, UserAccount, UserRole } from './types';
+import { SaleDetailsModal } from './components/SaleDetailsModal';
+import { SpectacleFrame, UserAccount, UserRole, BuyerInfo } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { generateReceiptPDF } from './services/receiptGenerator';
 
 const App: React.FC = () => {
   // --- USER AUTH & MANAGEMENT STATE ---
@@ -103,9 +105,11 @@ const App: React.FC = () => {
   // Sale Modal State
   const [isSaleModalOpen, setSaleModalOpen] = useState(false);
   const [frameToSell, setFrameToSell] = useState<SpectacleFrame | null>(null);
+  const [saleDefaultPlatform, setSaleDefaultPlatform] = useState<string>('inventory');
 
-  // View Mode State (Grid vs List)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Sale Details View State
+  const [isSaleDetailsOpen, setSaleDetailsOpen] = useState(false);
+  const [saleDetailsFrame, setSaleDetailsFrame] = useState<SpectacleFrame | null>(null);
 
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -146,10 +150,6 @@ const App: React.FC = () => {
           // Set default quantity if missing
           if (typeof frame.quantity !== 'number') {
             frame.quantity = 1;
-          }
-          // Migration for Sold Items: Ensure they have a soldPlatform
-          if (frame.isSold && !frame.soldPlatform) {
-             frame.soldPlatform = frame.category;
           }
           return frame;
         });
@@ -318,13 +318,13 @@ const App: React.FC = () => {
       message: 'ATENÇÃO: Você está prestes a apagar TODOS os óculos desta lista. Isso não poderá ser revertido. Deseja continuar?',
       action: () => {
         if (activeTab === 'list') {
-            setFrames(prev => prev.filter(f => f.category !== 'inventory' && !f.isSold));
+            setFrames(prev => prev.filter(f => f.category !== 'inventory'));
         } else if (activeTab === 'mercadolivre') {
-            setFrames(prev => prev.filter(f => f.category !== 'mercadolivre' && !f.isSold));
+            setFrames(prev => prev.filter(f => f.category !== 'mercadolivre'));
         } else if (activeTab === 'shopee') {
-            setFrames(prev => prev.filter(f => f.category !== 'shopee' && !f.isSold));
+            setFrames(prev => prev.filter(f => f.category !== 'shopee'));
         } else if (activeTab === 'amazon') {
-            setFrames(prev => prev.filter(f => f.category !== 'amazon' && !f.isSold));
+            setFrames(prev => prev.filter(f => f.category !== 'amazon'));
         } else if (activeTab === 'sold' || activeTab === 'physical_sales' || activeTab === 'online_sales') {
             setFrames(prev => prev.filter(f => !f.isSold));
         }
@@ -337,13 +337,20 @@ const App: React.FC = () => {
     setRegisterModalOpen(true);
   };
 
+  const handleViewSale = (frame: SpectacleFrame) => {
+    setSaleDetailsFrame(frame);
+    setSaleDetailsOpen(true);
+  };
+
   // --- SALE HANDLERS ---
   
   // 1. New Handler for "Cash Register" button (Quick Physical Sale)
   const handlePhysicalSale = (frame: SpectacleFrame) => {
       // Execute direct sale (Qty: 1) for Inventory (Physical Store)
       if (!frame.isSold) {
-         executeSale(frame, 'inventory', 1, false);
+         setFrameToSell(frame);
+         setSaleDefaultPlatform('inventory');
+         setSaleModalOpen(true);
       }
   };
 
@@ -351,31 +358,39 @@ const App: React.FC = () => {
   const handleStockUpdate = (frame: SpectacleFrame) => {
     if (frame.isSold) {
         // RESTORE: Immediate action, no modal needed
-        executeSale(frame, undefined, 0, true);
+        executeSale(frame, undefined, 0, undefined, true);
     } else {
-        // If we are inside a specific marketplace tab, sell contextually (Automatic)
+        // Prepare Modal
+        setFrameToSell(frame);
+        
+        // Determine default platform based on active tab
+        let defaultPlat = 'inventory';
         if (['mercadolivre', 'shopee', 'amazon'].includes(activeTab)) {
-            executeSale(frame, activeTab, 1, false);
-        } 
-        // If in Inventory or Home, ask where
-        else {
-            setFrameToSell(frame);
-            setSaleModalOpen(true);
+            defaultPlat = activeTab;
         }
+        setSaleDefaultPlatform(defaultPlat);
+        setSaleModalOpen(true);
     }
   };
 
   // Called after modal confirms platform
-  const handleConfirmSale = (platform: string, quantity: number) => {
+  const handleConfirmSale = (platform: string, quantity: number, buyerInfo?: BuyerInfo, generateReceipt?: boolean) => {
     if (frameToSell) {
-        executeSale(frameToSell, platform, quantity, false);
+        const saleRecord = executeSale(frameToSell, platform, quantity, buyerInfo, false);
         setSaleModalOpen(false);
         setFrameToSell(null);
+
+        // If requested, generate receipt PDF
+        if (generateReceipt && saleRecord) {
+             // We need to wait a tick for the state to settle, but we have the object here
+             // It's safer to pass the object directly to the generator
+             generateReceiptPDF(saleRecord);
+        }
     }
   };
 
   // The actual logic for updating stock
-  const executeSale = (frame: SpectacleFrame, platform?: string, qtyToSell: number = 1, isRestore?: boolean) => {
+  const executeSale = (frame: SpectacleFrame, platform?: string, qtyToSell: number = 1, buyerInfo?: BuyerInfo, isRestore?: boolean): SpectacleFrame | null => {
     
     // CASE 1: RESTORING A SALE (Undoing)
     if (isRestore) {
@@ -398,18 +413,18 @@ const App: React.FC = () => {
             } 
             return prev.map(f => {
                  if (f.id === frame.id) {
-                     return { ...f, isSold: false, quantity: 1, soldPlatform: undefined, soldAt: undefined };
+                     return { ...f, isSold: false, quantity: 1, soldPlatform: undefined, soldAt: undefined, buyerInfo: undefined };
                  }
                  return f;
             });
         });
-        return;
+        return null;
     }
 
     // CASE 2: NEW SALE
-    if (qtyToSell <= 0) return;
+    if (qtyToSell <= 0) return null;
 
-    // Create the "Historical Sales Record"
+    // Create the "Historical Sales Record" (The Receipt)
     const salesRecord: SpectacleFrame = {
         ...frame,
         id: uuidv4(),
@@ -418,6 +433,7 @@ const App: React.FC = () => {
         soldQuantity: qtyToSell,
         soldAt: Date.now(),
         quantity: qtyToSell, 
+        buyerInfo: buyerInfo, // Save buyer info
     };
 
     setFrames(prev => {
@@ -433,36 +449,63 @@ const App: React.FC = () => {
                     ...f,
                     quantity: nextQty,
                     isSold: nextQty === 0, 
+                    // CRITICAL: Ensure the empty stock item does NOT have a platform set, 
+                    // so it doesn't show up in the "Sold" list (which filters by soldPlatform)
+                    soldPlatform: undefined 
                 };
             }
             return f;
         });
 
+        // Add the sales record to the list so it appears in "All Sales"
         return [...updatedList, salesRecord];
     });
+
+    return salesRecord;
   };
 
+  // CLONING logic for marketplaces
   const handleMoveToMarketplace = (frame: SpectacleFrame, newPrice: number, target: 'mercadolivre' | 'shopee' | 'amazon' | 'all') => {
+     let newFrames: SpectacleFrame[] = [];
+     
      if (target === 'all') {
-        const mlFrame = { ...frame, category: 'mercadolivre' as const, storePrice: newPrice, hasMarketplaceListing: true };
-        const shopeeFrame = { ...frame, id: uuidv4(), category: 'shopee' as const, storePrice: newPrice, hasMarketplaceListing: true, createdAt: Date.now() };
-        const amazonFrame = { ...frame, id: uuidv4(), category: 'amazon' as const, storePrice: newPrice, hasMarketplaceListing: true, createdAt: Date.now() };
+        const mlFrame = { ...frame, id: uuidv4(), quantity: 1, category: 'mercadolivre' as const, storePrice: newPrice, hasMarketplaceListing: true, createdAt: Date.now() };
+        const shopeeFrame = { ...frame, id: uuidv4(), quantity: 1, category: 'shopee' as const, storePrice: newPrice, hasMarketplaceListing: true, createdAt: Date.now() };
+        const amazonFrame = { ...frame, id: uuidv4(), quantity: 1, category: 'amazon' as const, storePrice: newPrice, hasMarketplaceListing: true, createdAt: Date.now() };
         
-        setFrames(prev => {
-            const others = prev.filter(f => f.id !== frame.id);
-            return [...others, mlFrame, shopeeFrame, amazonFrame];
-        });
-        setActiveTab('mercadolivre');
+        newFrames = [mlFrame, shopeeFrame, amazonFrame];
+        alert("Itens registrados em todos os marketplaces!");
      } else {
-         const updatedFrame: SpectacleFrame = { ...frame, category: target, storePrice: newPrice, hasMarketplaceListing: true };
-         setFrames(prev => prev.map(f => f.id === frame.id ? updatedFrame : f));
-         setActiveTab(target);
+         // Create a COPY (Clone) for the specific marketplace
+         const newFrame: SpectacleFrame = { 
+             ...frame, 
+             id: uuidv4(), // Critical: New ID
+             category: target, 
+             storePrice: newPrice, 
+             hasMarketplaceListing: true,
+             quantity: 1, // Default to 1 or copy current? Usually 1 for listing
+             createdAt: Date.now()
+         };
+         newFrames = [newFrame];
+         alert(`Item registrado no ${target} com sucesso!`);
      }
+
+     setFrames(prev => {
+        // 1. Mark the ORIGINAL frame as processed in the Pricing Tab
+        const updatedList = prev.map(f => {
+            if (f.id === frame.id) {
+                return { ...f, hasMarketplaceListing: true };
+            }
+            return f;
+        });
+
+        // 2. Add the new clones
+        return [...updatedList, ...newFrames];
+     });
   };
 
   // --- FILTERING ---
   const filterFrames = (category: string) => {
-    // Only show items that are NOT sold in the main lists
     return frames.filter(f => f.category === category && !f.isSold && (
       searchTerm === '' || 
       f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -496,25 +539,25 @@ const App: React.FC = () => {
       visibleFrames = inventoryFrames;
       currentTitle = 'Inventário';
       printCategory = 'inventory';
-      framesToPrint = frames.filter(f => f.category === 'inventory' && !f.isSold); 
+      framesToPrint = frames.filter(f => f.category === 'inventory'); // Include sold in print too
       break;
     case 'mercadolivre':
       visibleFrames = mercadolivreFrames;
       currentTitle = 'Mercado Livre';
       printCategory = 'marketplace';
-      framesToPrint = frames.filter(f => f.category === 'mercadolivre' && !f.isSold);
+      framesToPrint = frames.filter(f => f.category === 'mercadolivre');
       break;
     case 'shopee':
       visibleFrames = shopeeFrames;
       currentTitle = 'Shopee';
       printCategory = 'marketplace';
-      framesToPrint = frames.filter(f => f.category === 'shopee' && !f.isSold);
+      framesToPrint = frames.filter(f => f.category === 'shopee');
       break;
     case 'amazon':
       visibleFrames = amazonFrames;
       currentTitle = 'Amazon';
       printCategory = 'marketplace';
-      framesToPrint = frames.filter(f => f.category === 'amazon' && !f.isSold);
+      framesToPrint = frames.filter(f => f.category === 'amazon');
       break;
     case 'sold':
       visibleFrames = soldFrames;
@@ -779,7 +822,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                  <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{currentUser.name}</p>
-                 <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate uppercase font-bold tracking-wider">{currentUser.role}</p>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate uppercase font-bold tracking-wider">{currentUser.role}</p>
               </div>
               <i className="fas fa-chevron-right text-xs text-slate-400"></i>
            </div>
@@ -837,23 +880,6 @@ const App: React.FC = () => {
               >
                 <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
               </button>
-
-              {(activeTab !== 'home' && activeTab !== 'pricing') && (
-                <div className="bg-slate-100 dark:bg-slate-700 rounded-lg p-1 flex">
-                   <button 
-                     onClick={() => setViewMode('grid')}
-                     className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     <i className="fas fa-th-large"></i>
-                   </button>
-                   <button 
-                     onClick={() => setViewMode('list')}
-                     className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     <i className="fas fa-list"></i>
-                   </button>
-                </div>
-              )}
            </div>
         </header>
 
@@ -944,13 +970,13 @@ const App: React.FC = () => {
 
                <FrameList 
                  frames={visibleFrames} 
-                 viewMode={viewMode}
                  onDelete={handleDeleteFrame}
                  onEdit={handleEditFrame}
                  onToggleStatus={handleStockUpdate} 
-                 onPhysicalSale={handlePhysicalSale} // New Handler
+                 onPhysicalSale={handlePhysicalSale} 
+                 onViewSale={handleViewSale}
                  userRole={userRole}
-                 currentCategory={activeTab} // Pass context
+                 currentCategory={activeTab} 
                />
             </div>
           )}
@@ -1016,6 +1042,13 @@ const App: React.FC = () => {
         onClose={() => { setSaleModalOpen(false); setFrameToSell(null); }}
         onConfirm={handleConfirmSale}
         maxQuantity={frameToSell?.quantity}
+        defaultPlatform={saleDefaultPlatform}
+      />
+
+      <SaleDetailsModal
+        isOpen={isSaleDetailsOpen}
+        onClose={() => { setSaleDetailsOpen(false); setSaleDetailsFrame(null); }}
+        frame={saleDetailsFrame}
       />
 
     </div>

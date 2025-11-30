@@ -17,6 +17,20 @@ export interface UserAccount {
   createdAt: number;
 }
 
+export interface BuyerInfo {
+  name: string;
+  cpf: string;
+  phone: string;
+  cep: string;
+  city: string;
+  state: string;
+  // New Fields
+  street: string;
+  number: string;
+  neighborhood: string;
+  complement: string;
+}
+
 export interface SpectacleFrame {
   id: string;
   name: string;           // Nome gerado (Modelo + Cor)
@@ -36,6 +50,7 @@ export interface SpectacleFrame {
   soldPlatform?: string;  // Where the sale happened (inventory, amazon, etc)
   soldQuantity?: number;  // How many were sold in this specific transaction
   soldAt?: number;        // Timestamp of sale
+  buyerInfo?: BuyerInfo;  // Dados do comprador
 
   // Dimensions
   lensWidth: number;      // Largura da lente (mm)

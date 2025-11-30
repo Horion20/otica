@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SpectacleFrame } from '../types';
 import { extractTextFromPDF } from '../services/pdfService';
-import { extractTextFromExcel, parseExcelToJSON } from '../services/excelService';
+import { extractTextFromExcel } from '../services/excelService';
 import { parseFramesFromCatalog, parseFrameFromImage, parseFrameFromUrl } from '../services/geminiService';
-import { mapExcelRowsToFrames, parsePDFTextOffline } from '../services/offlineService';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -17,9 +16,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
   const [foundFrames, setFoundFrames] = useState<SpectacleFrame[]>([]);
   const [error, setError] = useState<string | null>(null);
   
-  // Offline Mode State
-  const [useOfflineMode, setUseOfflineMode] = useState(true);
-
   // File Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -53,39 +49,24 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
     try {
       const fileName = file.name.toLowerCase();
       let frames: SpectacleFrame[] = [];
+      let text = '';
 
-      // --- OFFLINE MODE ---
-      if (useOfflineMode) {
-        if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx') || fileName.endsWith('.csv')) {
-            const jsonData = await parseExcelToJSON(file);
-            setStatus('analyzing');
-            frames = mapExcelRowsToFrames(jsonData);
-        } else if (fileName.endsWith('.pdf')) {
-            const text = await extractTextFromPDF(file);
-            setStatus('analyzing');
-            frames = parsePDFTextOffline(text);
-        } else {
-            throw new Error("Formato não suportado para modo offline.");
-        }
-      } 
-      // --- AI MODE ---
-      else {
-        let text = '';
-        if (fileName.endsWith('.pdf')) {
-          text = await extractTextFromPDF(file);
-        } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx') || fileName.endsWith('.csv')) {
-          text = await extractTextFromExcel(file);
-        } else {
-          throw new Error("Formato de arquivo não suportado.");
-        }
-        
-        if (!text || text.length < 5) {
-          throw new Error(`O arquivo parece estar vazio ou ilegível.`);
-        }
-
-        setStatus('analyzing');
-        frames = await parseFramesFromCatalog(text);
+      // Extract text based on file type
+      if (fileName.endsWith('.pdf')) {
+        text = await extractTextFromPDF(file);
+      } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx') || fileName.endsWith('.csv')) {
+        text = await extractTextFromExcel(file);
+      } else {
+        throw new Error("Formato de arquivo não suportado. Use PDF ou Excel/CSV.");
       }
+      
+      if (!text || text.length < 5) {
+        throw new Error(`O arquivo parece estar vazio ou ilegível.`);
+      }
+
+      setStatus('analyzing');
+      // Send text to AI
+      frames = await parseFramesFromCatalog(text);
       
       handleAnalysisResult(frames);
 
@@ -137,7 +118,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
   // --- COMMON HELPERS ---
   const handleAnalysisResult = (frames: SpectacleFrame[]) => {
     if (frames.length === 0) {
-        setError("Nenhum óculos válido foi identificado. Tente outro arquivo ou o modo IA.");
+        setError("Nenhum óculos válido foi identificado pela IA. Verifique se o arquivo contém dados claros.");
         setStatus('idle');
     } else {
         setFoundFrames(frames);
@@ -221,44 +202,22 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
                 {/* --- TAB: FILES --- */}
                 {activeTab === 'files' && (
                     <div className="flex flex-col h-full">
-                        {/* OFFLINE TOGGLE */}
-                        <div className="flex justify-center mb-6">
-                            <label className="flex items-center gap-3 cursor-pointer bg-slate-100 rounded-full px-4 py-2 border border-slate-200">
-                                <span className={`text-xs font-bold uppercase ${!useOfflineMode ? 'text-brand-600' : 'text-slate-400'}`}>Modo IA (Online)</span>
-                                <div className="relative">
-                                    <input 
-                                        type="checkbox" 
-                                        className="sr-only" 
-                                        checked={useOfflineMode} 
-                                        onChange={() => setUseOfflineMode(!useOfflineMode)}
-                                    />
-                                    <div className={`block w-10 h-6 rounded-full transition-colors ${useOfflineMode ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${useOfflineMode ? 'translate-x-4' : ''}`}></div>
-                                </div>
-                                <span className={`text-xs font-bold uppercase ${useOfflineMode ? 'text-green-600' : 'text-slate-400'}`}>Modo Offline (Rápido)</span>
-                            </label>
-                        </div>
-
                         <div 
                             className="flex-1 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-brand-400 hover:bg-brand-50 transition-all cursor-pointer group flex flex-col justify-center items-center"
                             onClick={() => fileInputRef.current?.click()}
                         >
-                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${useOfflineMode ? 'bg-green-50 text-green-600' : 'bg-brand-50 text-brand-600'}`}>
-                                <i className={`fas ${useOfflineMode ? 'fa-bolt' : 'fa-cloud-upload-alt'} text-3xl`}></i>
+                            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform bg-brand-50 text-brand-600">
+                                <i className="fas fa-cloud-upload-alt text-3xl"></i>
                             </div>
                             <h3 className="text-lg font-bold text-slate-700 mb-2">Clique para selecionar arquivos</h3>
                             <p className="text-slate-500 max-w-sm mx-auto mb-4">
                                 Suporta <strong>PDF, Excel (.xls, .xlsx) e CSV</strong>. <br/>
+                                <span className="text-xs">A IA analisará o conteúdo automaticamente.</span>
                             </p>
-                            {useOfflineMode ? (
-                                <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                                    <i className="fas fa-wifi-slash mr-1"></i> Processamento Local (Sem Internet)
-                                </span>
-                            ) : (
-                                <span className="inline-block px-3 py-1 bg-brand-100 text-brand-700 text-xs font-bold rounded-full">
-                                    <i className="fas fa-brain mr-1"></i> Processamento via IA (Gemini)
-                                </span>
-                            )}
+                            
+                            <span className="inline-block px-3 py-1 bg-brand-100 text-brand-700 text-xs font-bold rounded-full">
+                                <i className="fas fa-brain mr-1"></i> Processamento via IA (Gemini)
+                            </span>
                             
                             <input 
                                 type="file" 
@@ -331,18 +290,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImp
             <div className="flex flex-col items-center justify-center py-12 text-center h-full">
               <div className="relative w-24 h-24 mb-6">
                 <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                <div className={`absolute inset-0 border-4 ${useOfflineMode && activeTab === 'files' ? 'border-green-500' : 'border-brand-500'} rounded-full border-t-transparent animate-spin`}></div>
-                <div className={`absolute inset-0 flex items-center justify-center ${useOfflineMode && activeTab === 'files' ? 'text-green-600' : 'text-brand-600'} text-2xl`}>
-                  <i className={`fas ${useOfflineMode && activeTab === 'files' ? 'fa-bolt' : 'fa-robot'}`}></i>
+                <div className="absolute inset-0 border-4 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center text-brand-600 text-2xl">
+                  <i className="fas fa-robot"></i>
                 </div>
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
-                {status === 'reading' ? 'Lendo Arquivo...' : (useOfflineMode && activeTab === 'files' ? 'Processando Dados Offline...' : 'IA Identificando Óculos...')}
+                {status === 'reading' ? 'Lendo Arquivo...' : 'IA Identificando Óculos...'}
               </h3>
               <p className="text-slate-500">
                 {status === 'reading' 
-                  ? 'Preparando arquivo para análise.' 
-                  : (useOfflineMode && activeTab === 'files' ? 'Mapeando colunas e extraindo informações localmente.' : 'A Inteligência Artificial está analisando as imagens e textos.')}
+                  ? 'Extraindo texto do documento.' 
+                  : 'A Inteligência Artificial está analisando as imagens e textos para estruturar os dados.'}
               </p>
             </div>
           )}

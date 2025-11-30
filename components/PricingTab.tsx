@@ -20,9 +20,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
   const [markup, setMarkup] = useState<number>(2.0);
   const MARKUP_OPTIONS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
 
-  // Filter frames to only show Inventory items
+  // Filter frames to only show Inventory items AND items not yet processed for marketplace
   const filteredFrames = frames.filter(frame => {
     if (frame.category !== 'inventory') return false;
+    
+    // If the item has already been sent to a marketplace, hide it from this list
+    if (frame.hasMarketplaceListing) return false;
 
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -56,6 +59,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
   const handleMove = (target: 'mercadolivre' | 'shopee' | 'amazon' | 'all') => {
     if (selectedFrame) {
       onMoveToMarketplace(selectedFrame, calculatedPrice, target);
+      // Deselect after moving to allow quick selection of next item
+      setSelectedFrame(null);
     }
   };
 
@@ -81,7 +86,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ frames, onMoveToMarketpl
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {filteredFrames.length === 0 ? (
             <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm px-4">
-              {searchTerm ? 'Nenhum óculos encontrado.' : 'Nenhum item no inventário para exibir.'}
+              {searchTerm ? 'Nenhum óculos encontrado.' : 'Todos os itens do inventário já foram processados.'}
             </div>
           ) : (
             filteredFrames.map(frame => (

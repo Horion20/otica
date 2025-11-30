@@ -14,13 +14,3 @@ export const extractTextFromExcel = async (file: File): Promise<string> => {
   
   return `--- CONTEÚDO DO ARQUIVO EXCEL/CSV ---\n${csvOutput}`;
 };
-
-export const parseExcelToJSON = async (file: File): Promise<any[]> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer);
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  
-  // Convert to JSON array of objects
-  return XLSX.utils.sheet_to_json(sheet);
-};
